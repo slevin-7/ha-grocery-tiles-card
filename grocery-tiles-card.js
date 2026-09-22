@@ -68,15 +68,18 @@ class GroceryTilesCard extends HTMLElement {
       throw new Error('grocery-tiles-card: "entity" (todo.*) fehlt');
     }
     this._config = { ...DEFAULTS, ...config, overrides: Array.isArray(config.overrides) ? config.overrides : [] };
+    this._shell = null; // Hülle (inkl. Eingabefeld) neu aufbauen
     this._resubscribe();
     this._render();
   }
 
   set hass(hass) {
     const connChanged = this._hass?.connection !== hass?.connection;
+    const stChanged = this._hass?.states?.[this._config?.entity] !== hass?.states?.[this._config?.entity];
     this._hass = hass;
     if (connChanged) this._resubscribe();
-    this._render();
+    // HA setzt hass bei jeder Zustandsänderung irgendeiner Entity — nur rendern, wenn uns etwas betrifft.
+    if (stChanged || !this._shell) this._render();
   }
 
   connectedCallback() { this._resubscribe(); }
@@ -136,12 +139,47 @@ class GroceryTilesCard extends HTMLElement {
       <div class="emoji">${t.emoji}</div><div class="name">${esc(t.name)}</div>${t.qty ? `<div class="qty">${esc(t.qty)}</div>` : ''}</div>`;
   }
 
+  // Hülle (Style, Karte, Titel, Eingabezeile, Container) wird EINMAL gebaut. Das Eingabefeld
+  // überlebt so alle Updates — sonst verliert es bei jedem hass-Update den Fokus und HAs
+  // Tastenkürzel („a" = Assist) fangen die nächste Taste ab.
+  _buildShell() {
+    const cfg = this._config;
+    this.shadowRoot.innerHTML = `<style>${STYLE}${STYLE_ADD}${STYLE_MORE}</style><ha-card class="card" style="--gt-cols:${cfg.columns || 3}">
+      ${cfg.title ? `<h1>${esc(cfg.title)}</h1>` : ''}
+      <div class="addrow"><input class="add" type="text" placeholder="Artikel hinzufügen…" autocomplete="off" enterkeyhint="done"><button data-action="add" aria-label="Hinzufügen">+</button></div>
+      <div class="chips-slot"></div><div class="body-slot"></div><div class="toast-slot"></div></ha-card>`;
+    const root = this.shadowRoot;
+    this._shell = {
+      input: root.querySelector('input.add'),
+      chips: root.querySelector('.chips-slot'),
+      body: root.querySelector('.body-slot'),
+      toast: root.querySelector('.toast-slot'),
+    };
+    const { input } = this._shell;
+    input.addEventListener('input', () => { this._draft = input.value; this._renderChips(); });
+    input.addEventListener('keydown', e => { if (e.key === 'Enter') { e.preventDefault(); this._add(input.value); } });
+    root.querySelector('[data-action="add"]').addEventListener('click', () => this._add(input.value));
+  }
+
+  _setDraft(v) {
+    this._draft = v;
+    if (this._shell) this._shell.input.value = v;
+    this._renderChips();
+  }
+
+  _renderChips() {
+    if (!this._shell) return;
+    this._shell.chips.innerHTML = this._chipsHtml();
+    this._shell.chips.querySelectorAll('.chip').forEach(c => c.addEventListener('click', () => this._add(c.dataset.name)));
+  }
+
   _render() {
     if (!this._config) return;
+    if (!this._shell) this._buildShell();
     const cfg = this._config;
     const st = this._hass?.states?.[cfg.entity];
     const gridClass = cfg.columns > 0 ? 'grid fixed' : 'grid';
-    const addRow = `<div class="addrow"><input class="add" type="text" placeholder="Artikel hinzufügen…" autocomplete="off" enterkeyhint="done" ${(!st || st.state === 'unavailable') ? 'disabled' : ''}><button data-action="add" aria-label="Hinzufügen">+</button></div>`;
+    this._shell.input.disabled = !st || st.state === 'unavailable';
     let body = '';
     if (!st) {
       body = `<div class="warn">Entity nicht gefunden: ${esc(cfg.entity)}</div>`;
@@ -164,28 +202,16 @@ class GroceryTilesCard extends HTMLElement {
           ${rest > 0 ? `<button class="link" data-action="more">mehr anzeigen (${rest})</button>` : ''}`;
       }
     }
-    this.shadowRoot.innerHTML = `<style>${STYLE}${STYLE_ADD}${STYLE_MORE}</style><ha-card class="card" style="--gt-cols:${cfg.columns || 3}">
-      ${cfg.title ? `<h1>${esc(cfg.title)}</h1>` : ''}${addRow}${this._chipsHtml()}${body}${this._toastMsg ? `<div class="toast">${esc(this._toastMsg)}</div>` : ''}</ha-card>`;
-    this._wire();
+    this._shell.body.innerHTML = body;
+    this._shell.toast.innerHTML = this._toastMsg ? `<div class="toast">${esc(this._toastMsg)}</div>` : '';
+    this._renderChips();
+    this._wireBody();
   }
 
-  _wire() {
-    const root = this.shadowRoot;
-    const input = root.querySelector('input.add');
-    if (input) {
-      if (this._draft) input.value = this._draft;
-      input.addEventListener('input', () => {
-        this._draft = input.value;
-        this._render();
-        const el = this.shadowRoot.querySelector('input.add');
-        if (el) { el.focus(); el.setSelectionRange(el.value.length, el.value.length); }
-      });
-      input.addEventListener('keydown', e => { if (e.key === 'Enter') { e.preventDefault(); this._add(input.value); } });
-    }
-    root.querySelector('[data-action="add"]')?.addEventListener('click', () => this._add(input?.value || ''));
+  _wireBody() {
+    const root = this._shell.body;
     root.querySelector('[data-action="clear"]')?.addEventListener('click', () => this._clearCompleted());
     root.querySelector('[data-action="more"]')?.addEventListener('click', () => { this._showAllRecent = true; this._render(); });
-    root.querySelectorAll('.chip').forEach(c => c.addEventListener('click', () => this._add(c.dataset.name)));
     root.querySelectorAll('.tile').forEach(el => {
       el.addEventListener('click', () => {
         if (this._menuJustOpened) { this._menuJustOpened = false; return; }
@@ -266,10 +292,10 @@ class GroceryTilesCard extends HTMLElement {
     if (!summary) return;
     const key = normalize(summary);
     const open = this._items.find(i => i.status === 'needs_action' && normalize(i.summary) === key);
-    if (open) { this._draft = ''; this._toast(`„${splitQuantity(open.summary).name}" ist schon auf der Liste`); return; }
+    if (open) { this._setDraft(''); this._toast(`„${splitQuantity(open.summary).name}" ist schon auf der Liste`); return; }
     const done = this._items.find(i => i.status === 'completed' && normalize(i.summary) === key);
-    if (done) { this._draft = ''; this._toggle(done.uid); return; }
-    this._draft = '';
+    if (done) { this._setDraft(''); this._toggle(done.uid); return; }
+    this._setDraft('');
     const tmp = { uid: `tmp-${Date.now()}`, summary, status: 'needs_action' };
     this._optimistic(items => [...items, tmp], 'add_item', { item: summary });
   }
