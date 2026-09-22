@@ -215,3 +215,229 @@ export function categorize(name, overrides = []) {
   }
   return 'other';
 }
+
+const EMOJI = {
+  'milch': '🥛',
+  'milk': '🥛',
+  'butter': '🧈',
+  'käse': '🧀',
+  'cheese': '🧀',
+  'frischkäse': '🧀',
+  'joghurt': '🥛',
+  'yogurt': '🥛',
+  'quark': '🥛',
+  'sahne': '🥛',
+  'cream': '🥛',
+  'apfel': '🍎',
+  'äpfel': '🍎',
+  'apple': '🍎',
+  'banane': '🍌',
+  'bananen': '🍌',
+  'banana': '🍌',
+  'orange': '🍊',
+  'orangen': '🍊',
+  'zitrone': '🍋',
+  'zitronen': '🍋',
+  'lemon': '🍋',
+  'erdbeere': '🍓',
+  'erdbeeren': '🍓',
+  'strawberry': '🍓',
+  'traube': '🍇',
+  'trauben': '🍇',
+  'grape': '🍇',
+  'kirsche': '🍒',
+  'kirschen': '🍒',
+  'pfirsich': '🍑',
+  'birne': '🍐',
+  'pear': '🍐',
+  'ananas': '🍍',
+  'kiwi': '🥝',
+  'mango': '🥭',
+  'himbeere': '🫐',
+  'raspberry': '🫐',
+  'beeren': '🫐',
+  'berries': '🫐',
+  'tomate': '🍅',
+  'tomaten': '🍅',
+  'tomato': '🍅',
+  'karotte': '🥕',
+  'karotten': '🥕',
+  'möhre': '🥕',
+  'möhren': '🥕',
+  'carrot': '🥕',
+  'zwiebel': '🧅',
+  'zwiebeln': '🧅',
+  'onion': '🧅',
+  'knoblauch': '🧄',
+  'paprika': '🫑',
+  'pepper': '🫑',
+  'gurke': '🥒',
+  'gurken': '🥒',
+  'cucumber': '🥒',
+  'salat': '🥬',
+  'lettuce': '🥬',
+  'feldsalat': '🥬',
+  'kartoffel': '🥔',
+  'kartoffeln': '🥔',
+  'potato': '🥔',
+  'brokkoli': '🥦',
+  'broccoli': '🥦',
+  'spinat': '🥬',
+  'spinach': '🥬',
+  'pilz': '🍄',
+  'pilze': '🍄',
+  'champignon': '🍄',
+  'champignons': '🍄',
+  'brot': '🍞',
+  'bread': '🍞',
+  'brötchen': '🥖',
+  'roll': '🥖',
+  'toast': '🍞',
+  'croissant': '🥐',
+  'kuchen': '🍰',
+  'cake': '🍰',
+  'kekse': '🍪',
+  'keks': '🍪',
+  'cookie': '🍪',
+  'gebäck': '🥐',
+  'bakery': '🥐',
+  'fleisch': '🥩',
+  'meat': '🥩',
+  'hähnchen': '🍗',
+  'huhn': '🍗',
+  'chicken': '🍗',
+  'rind': '🥩',
+  'beef': '🥩',
+  'schwein': '🥩',
+  'pork': '🥩',
+  'wurst': '🌭',
+  'sausage': '🌭',
+  'speck': '🥓',
+  'fisch': '🐟',
+  'fish': '🐟',
+  'räucherfisch': '🐟',
+  'lachs': '🐟',
+  'salmon': '🐟',
+  'thunfisch': '🐟',
+  'tuna': '🐟',
+  'schnitzel': '🍖',
+  'ei': '🥚',
+  'eier': '🥚',
+  'egg': '🥚',
+  'eggs': '🥚',
+  'nudeln': '🍝',
+  'pasta': '🍝',
+  'spaghetti': '🍝',
+  'penne': '🍝',
+  'noodles': '🍝',
+  'reis': '🍚',
+  'rice': '🍚',
+  'mehl': '🌾',
+  'haferflocken': '🌾',
+  'getreide': '🌾',
+  'grain': '🌾',
+  'linsen': '🫘',
+  'tellerlinsen': '🫘',
+  'belugalinsen': '🫘',
+  'schokolade': '🍫',
+  'chocolate': '🍫',
+  'bonbon': '🍬',
+  'candy': '🍬',
+  'gummi': '🍬',
+  'süßigkeit': '🍬',
+  'sweet': '🍬',
+  'zucker': '🍯',
+  'honig': '🍯',
+  'nüsse': '🥜',
+  'salz': '🧂',
+  'pfeffer': '🧂',
+  'öl': '🫒',
+  'olivenöl': '🫒',
+  'essig': '🍶',
+  'balsamico': '🍶',
+  'dill': '🌿',
+  'meerrettich': '🌿',
+  'wasser': '💧',
+  'water': '💧',
+  'saft': '🧃',
+  'juice': '🧃',
+  'tee': '🍵',
+  'tea': '🍵',
+  'kaffee': '☕',
+  'coffee': '☕',
+  'bier': '🍺',
+  'beer': '🍺',
+  'wein': '🍷',
+  'wine': '🍷',
+  'cola': '🥤',
+  'limonade': '🥤',
+  'limo': '🥤',
+  'soda': '🥤',
+  'sprite': '🥤',
+  'drink': '🥤',
+  'getränk': '🥤',
+  'eis': '🍦',
+  'pizza': '🍕',
+  'seife': '🧼',
+  'shampoo': '🧴',
+  'zahnpasta': '🦷',
+  'toilettenpapier': '🧻',
+  'klopapier': '🧻',
+  'waschmittel': '🧽',
+  'spülmittel': '🧽',
+  'windeln': '👶',
+  'katzenfutter': '🐱',
+  'hundefutter': '🐕',
+  'chips': '🍟',
+};
+
+const EMOJI_BY_LENGTH = Object.keys(EMOJI).sort((a, b) => b.length - a.length);
+export const EMOJI_KEYS = Object.keys(EMOJI);
+const CATEGORY_EMOJI = Object.fromEntries(CATEGORIES.map(c => [c.id, c.emoji]));
+
+export function emojiFor(name, overrides = []) {
+  const lower = String(name || '').toLowerCase().trim();
+  if (!lower) return '🛒';
+  const o = findOverride(lower, overrides);
+  if (o && o.emoji) return o.emoji;
+  if (EMOJI[lower]) return EMOJI[lower];
+  for (const key of EMOJI_BY_LENGTH) if (lower.includes(key)) return EMOJI[key];
+  return CATEGORY_EMOJI[categorize(lower, overrides)] || '🛒';
+}
+
+const LEADING_QTY = /^\s*(\d+(?:[.,]\d+)?\s*(?:x|×)?(?:\s*(?:stück|stk\.?|st\.?|kg|g|l|ml|el|tl|pck\.?|packung|packungen|dose|dosen|flasche|flaschen|bund|becher|glas|scheiben|pack|liter|gramm))?)\s+(.+)$/i;
+const TRAILING_QTY = /^(.*\S)\s+\((\d+)\)\s*$/;
+
+export function splitQuantity(summary) {
+  const s = String(summary || '').trim().replace(/\s+/g, ' ');
+  let m = LEADING_QTY.exec(s);
+  if (m) return { name: m[2].trim(), qty: m[1].trim() };
+  m = TRAILING_QTY.exec(s);
+  if (m) return { name: m[1].trim(), qty: m[2] };
+  return { name: s, qty: '' };
+}
+
+export function normalize(name) {
+  return splitQuantity(name).name.toLowerCase().replace(/\s+/g, ' ').trim();
+}
+
+const cap = s => s.charAt(0).toUpperCase() + s.slice(1);
+
+export function suggest(prefix, recentNames = [], limit = 6) {
+  const p = String(prefix || '').toLowerCase().trim();
+  if (!p || limit <= 0) return [];
+  const out = [];
+  const seen = new Set();
+  const push = s => {
+    const value = String(s || '').trim();
+    const k = value.toLowerCase();
+    if (value && !seen.has(k)) {
+      seen.add(k);
+      out.push(value);
+    }
+  };
+  for (const r of recentNames) if (String(r || '').toLowerCase().includes(p)) push(r);
+  for (const k of EMOJI_KEYS) if (k.startsWith(p)) push(cap(k));
+  for (const k of EMOJI_KEYS) if (k.includes(p)) push(cap(k));
+  return out.slice(0, limit);
+}
