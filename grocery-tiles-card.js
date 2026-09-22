@@ -1,5 +1,5 @@
 // grocery-tiles-card.js
-import { CATEGORIES, categorize, emojiFor, splitQuantity } from './food-db.js';
+import { CATEGORIES, categorize, emojiFor, splitQuantity, suggest, normalize } from './food-db.js';
 
 const DEFAULTS = { title: '', columns: 0, show_recent: true, recent_limit: 30, show_clear_completed: true, overrides: [] };
 
@@ -35,9 +35,20 @@ const STYLE_ADD = `
   .tile.pending { opacity: .4; pointer-events: none; }
 `;
 
+const STYLE_MORE = `
+  .chips { display: flex; flex-wrap: wrap; gap: 6px; margin: 6px 0 2px; }
+  .chip { border-radius: 16px; padding: 5px 10px; background: var(--secondary-background-color); font-size: 13px; cursor: pointer; border: 0; color: var(--primary-text-color); font: inherit; }
+  .menu { position: fixed; z-index: 10; background: var(--card-background-color); border: 1px solid var(--divider-color); border-radius: 8px; box-shadow: 0 4px 16px rgba(0,0,0,.2); min-width: 160px; }
+  .menu button { display: block; width: 100%; text-align: left; background: none; border: 0; padding: 10px 14px; font: inherit; color: var(--primary-text-color); cursor: pointer; }
+  .menu button:hover { background: var(--secondary-background-color); }
+  .menu input { width: calc(100% - 28px); margin: 8px 14px; font: inherit; }
+`;
+
 const esc = s => String(s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 
 class GroceryTilesCard extends HTMLElement {
+  static getConfigElement() { return document.createElement('grocery-tiles-card-editor'); }
+
   static getStubConfig(hass) {
     const first = Object.keys(hass?.states || {}).find(id => id.startsWith('todo.'));
     return { entity: first || 'todo.einkaufsliste' };
@@ -113,6 +124,13 @@ class GroceryTilesCard extends HTMLElement {
   }
 
   // ── Rendering ───────────────────────────────────────────────
+  _chipsHtml() {
+    if (!this._draft) return '';
+    const names = [...this._done(), ...this._open()].map(t => t.name);
+    const s = suggest(this._draft, names, 6);
+    return s.length ? `<div class="chips">${s.map(n => `<button class="chip" data-name="${esc(n)}">${emojiFor(n, this._config.overrides)} ${esc(n)}</button>`).join('')}</div>` : '';
+  }
+
   _tile(t, done) {
     return `<div class="tile${done ? ' done' : ''}" data-uid="${esc(t.uid)}" role="button" tabindex="0" aria-label="${esc(t.name)}${done ? ' (erledigt)' : ''}">
       <div class="emoji">${t.emoji}</div><div class="name">${esc(t.name)}</div>${t.qty ? `<div class="qty">${esc(t.qty)}</div>` : ''}</div>`;
@@ -146,8 +164,8 @@ class GroceryTilesCard extends HTMLElement {
           ${rest > 0 ? `<button class="link" data-action="more">mehr anzeigen (${rest})</button>` : ''}`;
       }
     }
-    this.shadowRoot.innerHTML = `<style>${STYLE}${STYLE_ADD}</style><ha-card class="card" style="--gt-cols:${cfg.columns || 3}">
-      ${cfg.title ? `<h1>${esc(cfg.title)}</h1>` : ''}${addRow}${body}${this._toastMsg ? `<div class="toast">${esc(this._toastMsg)}</div>` : ''}</ha-card>`;
+    this.shadowRoot.innerHTML = `<style>${STYLE}${STYLE_ADD}${STYLE_MORE}</style><ha-card class="card" style="--gt-cols:${cfg.columns || 3}">
+      ${cfg.title ? `<h1>${esc(cfg.title)}</h1>` : ''}${addRow}${this._chipsHtml()}${body}${this._toastMsg ? `<div class="toast">${esc(this._toastMsg)}</div>` : ''}</ha-card>`;
     this._wire();
   }
 
@@ -156,16 +174,63 @@ class GroceryTilesCard extends HTMLElement {
     const input = root.querySelector('input.add');
     if (input) {
       if (this._draft) input.value = this._draft;
-      input.addEventListener('input', () => { this._draft = input.value; });
+      input.addEventListener('input', () => {
+        this._draft = input.value;
+        this._render();
+        const el = this.shadowRoot.querySelector('input.add');
+        if (el) { el.focus(); el.setSelectionRange(el.value.length, el.value.length); }
+      });
       input.addEventListener('keydown', e => { if (e.key === 'Enter') { e.preventDefault(); this._add(input.value); } });
     }
     root.querySelector('[data-action="add"]')?.addEventListener('click', () => this._add(input?.value || ''));
     root.querySelector('[data-action="clear"]')?.addEventListener('click', () => this._clearCompleted());
     root.querySelector('[data-action="more"]')?.addEventListener('click', () => { this._showAllRecent = true; this._render(); });
+    root.querySelectorAll('.chip').forEach(c => c.addEventListener('click', () => this._add(c.dataset.name)));
     root.querySelectorAll('.tile').forEach(el => {
-      el.addEventListener('click', () => this._toggle(el.dataset.uid));
+      el.addEventListener('click', () => {
+        if (this._menuJustOpened) { this._menuJustOpened = false; return; }
+        this._toggle(el.dataset.uid);
+      });
       el.addEventListener('keydown', e => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); this._toggle(el.dataset.uid); } });
+      // Long-Press (500 ms) → Menü Umbenennen/Löschen
+      let timer;
+      const start = () => { timer = setTimeout(() => { timer = null; this._openMenu(el.dataset.uid, el); }, 500); };
+      const cancel = () => { if (timer) { clearTimeout(timer); timer = null; } };
+      el.addEventListener('pointerdown', start);
+      ['pointerup', 'pointerleave', 'pointercancel'].forEach(ev => el.addEventListener(ev, cancel));
+      el.addEventListener('contextmenu', e => { e.preventDefault(); this._openMenu(el.dataset.uid, el); });
     });
+  }
+
+  _openMenu(uid, anchor) {
+    this._closeMenu();
+    const it = this._items.find(i => i.uid === uid);
+    if (!it) return;
+    this._menuJustOpened = true;
+    const r = anchor.getBoundingClientRect();
+    const menu = document.createElement('div');
+    menu.className = 'menu';
+    menu.style.left = `${Math.min(r.left, window.innerWidth - 180)}px`;
+    menu.style.top = `${Math.min(r.bottom + 4, window.innerHeight - 120)}px`;
+    menu.innerHTML = `<button data-action="rename">Umbenennen</button><button data-action="delete">Löschen</button>`;
+    menu.querySelector('[data-action="delete"]').addEventListener('click', () => { this._closeMenu(); this._remove(uid); });
+    menu.querySelector('[data-action="rename"]').addEventListener('click', () => {
+      menu.innerHTML = `<input type="text" value="${esc(it.summary)}" aria-label="Neuer Name">`;
+      const inp = menu.querySelector('input'); inp.focus(); inp.select();
+      inp.addEventListener('keydown', e => {
+        if (e.key === 'Enter') { this._closeMenu(); this._rename(uid, inp.value); }
+        if (e.key === 'Escape') this._closeMenu();
+      });
+    });
+    this.shadowRoot.appendChild(menu);
+    this._menu = menu;
+    setTimeout(() => document.addEventListener('pointerdown', this._outsideHandler = e => { if (!e.composedPath().includes(menu)) this._closeMenu(); }, { once: true }), 0);
+  }
+
+  _closeMenu() {
+    this._menu?.remove();
+    this._menu = null;
+    if (this._outsideHandler) { document.removeEventListener('pointerdown', this._outsideHandler); this._outsideHandler = null; }
   }
 
   // ── Aktionen ────────────────────────────────────────────────
@@ -199,6 +264,11 @@ class GroceryTilesCard extends HTMLElement {
   async _add(text) {
     const summary = String(text || '').trim().replace(/\s+/g, ' ');
     if (!summary) return;
+    const key = normalize(summary);
+    const open = this._items.find(i => i.status === 'needs_action' && normalize(i.summary) === key);
+    if (open) { this._draft = ''; this._toast(`„${splitQuantity(open.summary).name}" ist schon auf der Liste`); return; }
+    const done = this._items.find(i => i.status === 'completed' && normalize(i.summary) === key);
+    if (done) { this._draft = ''; this._toggle(done.uid); return; }
     this._draft = '';
     const tmp = { uid: `tmp-${Date.now()}`, summary, status: 'needs_action' };
     this._optimistic(items => [...items, tmp], 'add_item', { item: summary });
@@ -225,6 +295,34 @@ class GroceryTilesCard extends HTMLElement {
   }
 }
 
+class GroceryTilesCardEditor extends HTMLElement {
+  setConfig(config) { this._config = { ...config }; this._render(); }
+  set hass(hass) { this._hass = hass; this._render(); }
+  _render() {
+    if (!this._hass || !this._config) return;
+    if (!this._form) {
+      this._form = document.createElement('ha-form');
+      this._form.computeLabel = s => ({ entity: 'To-do-Entity', title: 'Titel', columns: 'Spalten (0 = automatisch)', show_recent: '„Zuletzt" anzeigen', recent_limit: 'Max. Kacheln unter „Zuletzt"', show_clear_completed: 'Button „Erledigte löschen"' }[s.name] || s.name);
+      this._form.schema = [
+        { name: 'entity', required: true, selector: { entity: { domain: 'todo' } } },
+        { name: 'title', selector: { text: {} } },
+        { name: 'columns', selector: { number: { min: 0, max: 8, mode: 'box' } } },
+        { name: 'show_recent', selector: { boolean: {} } },
+        { name: 'recent_limit', selector: { number: { min: 1, max: 200, mode: 'box' } } },
+        { name: 'show_clear_completed', selector: { boolean: {} } },
+      ];
+      this._form.addEventListener('value-changed', e => {
+        this._config = { ...this._config, ...e.detail.value };
+        this.dispatchEvent(new CustomEvent('config-changed', { detail: { config: this._config }, bubbles: true, composed: true }));
+      });
+      this.appendChild(this._form);
+    }
+    this._form.hass = this._hass;
+    this._form.data = { ...DEFAULTS, ...this._config };
+  }
+}
+
+customElements.define('grocery-tiles-card-editor', GroceryTilesCardEditor);
 customElements.define('grocery-tiles-card', GroceryTilesCard);
 window.customCards = window.customCards || [];
 window.customCards.push({ type: 'grocery-tiles-card', name: 'Grocery Tiles Card', description: 'Einkaufsliste als Emoji-Kacheln nach Kategorien (Bring-Style) für jede todo-Entity.', preview: true });
