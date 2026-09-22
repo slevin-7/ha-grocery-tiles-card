@@ -1,0 +1,41 @@
+<!-- test/harness.html -->
+<!doctype html><meta charset="utf-8"><title>grocery-tiles-card harness</title>
+<style>body{margin:0;padding:16px;background:#fafafa;font-family:Roboto,system-ui,sans-serif;
+  --card-background-color:#fff;--secondary-background-color:#f0f0f0;--primary-text-color:#212121;
+  --secondary-text-color:#727272;--divider-color:#e0e0e0;--primary-color:#03a9f4;}
+  .wrap{max-width:500px}</style>
+<div class="wrap"><grocery-tiles-card id="card"></grocery-tiles-card></div>
+<script type="module">
+  import '../grocery-tiles-card.js';
+  const ENTITY = 'todo.mealie_einkaufsliste';
+  const items = [
+    { uid: '1', summary: '2 Stück Eier', status: 'needs_action' },
+    { uid: '2', summary: 'Hafermilch', status: 'needs_action' },
+    { uid: '3', summary: 'Bananen', status: 'needs_action' },
+    { uid: '4', summary: '1 kg Karotten', status: 'needs_action' },
+    { uid: '5', summary: 'Bier alkoholfrei', status: 'needs_action' },
+    { uid: '6', summary: 'Alufolie', status: 'needs_action' },
+    { uid: '7', summary: 'Butter', status: 'completed' },
+    { uid: '8', summary: 'Brötchen', status: 'completed' },
+    { uid: '9', summary: 'Lachs', status: 'completed' },
+  ];
+  let cb = null;
+  const emit = () => cb && cb({ items: items.map(i => ({ ...i })) });
+  window.hass = {
+    states: { [ENTITY]: { state: String(items.filter(i => i.status === 'needs_action').length), attributes: { friendly_name: 'Einkaufsliste' } } },
+    connection: { subscribeMessage: async (fn, msg) => { console.log('subscribe', msg); cb = fn; setTimeout(emit, 0); return () => { cb = null; }; } },
+    callService: async (domain, service, data, target) => {
+      console.log('callService', domain, service, JSON.stringify(data), JSON.stringify(target));
+      if (window.failNext) { window.failNext = false; throw new Error('Simulierter Fehler'); }
+      if (service === 'add_item') items.push({ uid: String(Date.now()), summary: data.item, status: 'needs_action' });
+      if (service === 'update_item') { const it = items.find(i => i.uid === data.item); if (data.status) it.status = data.status; if (data.rename) it.summary = data.rename; }
+      if (service === 'remove_item') for (const u of data.item) { const i = items.findIndex(x => x.uid === u); if (i >= 0) items.splice(i, 1); }
+      if (service === 'remove_completed_items') for (let i = items.length - 1; i >= 0; i--) if (items[i].status === 'completed') items.splice(i, 1);
+      setTimeout(emit, 50);
+    },
+  };
+  const card = document.getElementById('card');
+  card.setConfig({ entity: ENTITY, title: 'Einkaufsliste' });
+  card.hass = window.hass;
+  window.card = card;
+</script>
