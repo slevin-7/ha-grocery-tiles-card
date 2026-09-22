@@ -26,6 +26,15 @@ const STYLE = `
   button.link { background: none; border: 0; color: var(--primary-color); cursor: pointer; font: inherit; font-size: 13px; padding: 4px 8px; }
 `;
 
+const STYLE_ADD = `
+  .addrow { display: flex; gap: 8px; margin-bottom: 4px; }
+  .addrow input { flex: 1; font: inherit; font-size: 15px; padding: 10px 12px; border-radius: 8px; border: 1px solid var(--divider-color); background: var(--secondary-background-color); color: var(--primary-text-color); outline: none; }
+  .addrow input:focus { border-color: var(--primary-color); }
+  .addrow button { font: inherit; font-size: 20px; width: 44px; border-radius: 8px; border: 0; background: var(--primary-color); color: #fff; cursor: pointer; }
+  .toast { position: sticky; bottom: 8px; margin: 8px auto 0; width: fit-content; max-width: 90%; background: var(--primary-text-color); color: var(--card-background-color); padding: 8px 14px; border-radius: 8px; font-size: 13px; }
+  .tile.pending { opacity: .4; pointer-events: none; }
+`;
+
 const esc = s => String(s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 
 class GroceryTilesCard extends HTMLElement {
@@ -114,6 +123,7 @@ class GroceryTilesCard extends HTMLElement {
     const cfg = this._config;
     const st = this._hass?.states?.[cfg.entity];
     const gridClass = cfg.columns > 0 ? 'grid fixed' : 'grid';
+    const addRow = `<div class="addrow"><input class="add" type="text" placeholder="Artikel hinzufügen…" autocomplete="off" enterkeyhint="done" ${(!st || st.state === 'unavailable') ? 'disabled' : ''}><button data-action="add" aria-label="Hinzufügen">+</button></div>`;
     let body = '';
     if (!st) {
       body = `<div class="warn">Entity nicht gefunden: ${esc(cfg.entity)}</div>`;
@@ -136,9 +146,82 @@ class GroceryTilesCard extends HTMLElement {
           ${rest > 0 ? `<button class="link" data-action="more">mehr anzeigen (${rest})</button>` : ''}`;
       }
     }
-    this.shadowRoot.innerHTML = `<style>${STYLE}</style><ha-card class="card" style="--gt-cols:${cfg.columns || 3}">
-      ${cfg.title ? `<h1>${esc(cfg.title)}</h1>` : ''}${body}</ha-card>`;
-    this.shadowRoot.querySelector('[data-action="more"]')?.addEventListener('click', () => { this._showAllRecent = true; this._render(); });
+    this.shadowRoot.innerHTML = `<style>${STYLE}${STYLE_ADD}</style><ha-card class="card" style="--gt-cols:${cfg.columns || 3}">
+      ${cfg.title ? `<h1>${esc(cfg.title)}</h1>` : ''}${addRow}${body}${this._toastMsg ? `<div class="toast">${esc(this._toastMsg)}</div>` : ''}</ha-card>`;
+    this._wire();
+  }
+
+  _wire() {
+    const root = this.shadowRoot;
+    const input = root.querySelector('input.add');
+    if (input) {
+      if (this._draft) input.value = this._draft;
+      input.addEventListener('input', () => { this._draft = input.value; });
+      input.addEventListener('keydown', e => { if (e.key === 'Enter') { e.preventDefault(); this._add(input.value); } });
+    }
+    root.querySelector('[data-action="add"]')?.addEventListener('click', () => this._add(input?.value || ''));
+    root.querySelector('[data-action="clear"]')?.addEventListener('click', () => this._clearCompleted());
+    root.querySelector('[data-action="more"]')?.addEventListener('click', () => { this._showAllRecent = true; this._render(); });
+    root.querySelectorAll('.tile').forEach(el => {
+      el.addEventListener('click', () => this._toggle(el.dataset.uid));
+      el.addEventListener('keydown', e => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); this._toggle(el.dataset.uid); } });
+    });
+  }
+
+  // ── Aktionen ────────────────────────────────────────────────
+  _toast(msg) {
+    this._toastMsg = msg;
+    this._render();
+    clearTimeout(this._toastTimer);
+    this._toastTimer = setTimeout(() => { this._toastMsg = ''; this._render(); }, 4000);
+  }
+
+  _call(service, data) {
+    return this._hass.callService('todo', service, data, { entity_id: this._config.entity });
+  }
+
+  // Optimistisch: lokale Kopie ändern, rendern, Service rufen, bei Fehler alte Items zurück.
+  async _optimistic(mutate, service, data) {
+    const before = this._items;
+    this._items = mutate(before.map(i => ({ ...i })));
+    this._render();
+    try { await this._call(service, data); }
+    catch (e) { this._items = before; this._toast(e?.message || 'Fehler'); }
+  }
+
+  _toggle(uid) {
+    const it = this._items.find(i => i.uid === uid);
+    if (!it) return;
+    const status = it.status === 'completed' ? 'needs_action' : 'completed';
+    this._optimistic(items => items.map(i => i.uid === uid ? { ...i, status } : i), 'update_item', { item: uid, status });
+  }
+
+  async _add(text) {
+    const summary = String(text || '').trim().replace(/\s+/g, ' ');
+    if (!summary) return;
+    this._draft = '';
+    const tmp = { uid: `tmp-${Date.now()}`, summary, status: 'needs_action' };
+    this._optimistic(items => [...items, tmp], 'add_item', { item: summary });
+  }
+
+  _rename(uid, text) {
+    const rename = String(text || '').trim();
+    if (!rename) return;
+    this._optimistic(items => items.map(i => i.uid === uid ? { ...i, summary: rename } : i), 'update_item', { item: uid, rename });
+  }
+
+  _remove(uid) {
+    const it = this._items.find(i => i.uid === uid);
+    if (!it) return;
+    this._optimistic(items => items.filter(i => i.uid !== uid), 'remove_item', { item: [uid] });
+    this._toast(`„${splitQuantity(it.summary).name}" gelöscht`);
+  }
+
+  _clearCompleted() {
+    const n = this._items.filter(i => i.status === 'completed').length;
+    if (!n) return;
+    if (!confirm(`${n} erledigte Einträge endgültig löschen?`)) return;
+    this._optimistic(items => items.filter(i => i.status !== 'completed'), 'remove_completed_items', {});
   }
 }
 
