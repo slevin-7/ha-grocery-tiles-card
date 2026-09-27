@@ -1,7 +1,8 @@
 // grocery-tiles-card.js
 import { CATEGORIES, categorize, emojiFor, splitQuantity, suggest, normalize } from './food-db.js';
+import { t, pickLang } from './i18n.js';
 
-const DEFAULTS = { title: '', columns: 0, show_recent: true, recent_limit: 30, show_clear_completed: true, overrides: [] };
+const DEFAULTS = { title: '', columns: 0, show_recent: true, recent_limit: 30, show_clear_completed: true, overrides: [], language: '' };
 
 const STYLE = `
   :host { display: block; }
@@ -76,8 +77,10 @@ class GroceryTilesCard extends HTMLElement {
   set hass(hass) {
     const connChanged = this._hass?.connection !== hass?.connection;
     const stChanged = this._hass?.states?.[this._config?.entity] !== hass?.states?.[this._config?.entity];
+    const langChanged = this._hass && pickLang(this._config, this._hass) !== pickLang(this._config, hass);
     this._hass = hass;
     if (connChanged) this._resubscribe();
+    if (langChanged) this._shell = null; // Platzhalter/aria im Eingabefeld hängen an der Sprache
     // HA setzt hass bei jeder Zustandsänderung irgendeiner Entity — nur rendern, wenn uns etwas betrifft.
     if (stChanged || !this._shell) this._render();
   }
@@ -86,6 +89,8 @@ class GroceryTilesCard extends HTMLElement {
   disconnectedCallback() { this._unsubscribe(); }
 
   getCardSize() { return 3 + this._groups().length; }
+  _lang() { return pickLang(this._config, this._hass); }
+  _t(key, vars) { return t(this._lang(), key, vars); }
   getGridOptions() { return { columns: 'full' }; }
 
   _unsubscribe() {
@@ -122,7 +127,7 @@ class GroceryTilesCard extends HTMLElement {
   _groups() {
     const open = this._open();
     return CATEGORIES
-      .map(c => ({ c, tiles: open.filter(t => t.category === c.id).sort((a, b) => a.name.localeCompare(b.name, 'de')) }))
+      .map(c => ({ c, tiles: open.filter(t => t.category === c.id).sort((a, b) => a.name.localeCompare(b.name, this._lang())) }))
       .filter(g => g.tiles.length);
   }
 
@@ -135,7 +140,7 @@ class GroceryTilesCard extends HTMLElement {
   }
 
   _tile(t, done) {
-    return `<div class="tile${done ? ' done' : ''}" data-uid="${esc(t.uid)}" role="button" tabindex="0" aria-label="${esc(t.name)}${done ? ' (erledigt)' : ''}">
+    return `<div class="tile${done ? ' done' : ''}" data-uid="${esc(t.uid)}" role="button" tabindex="0" aria-label="${esc(t.name)}${done ? ` (${esc(this._t('done'))})` : ''}">
       <div class="emoji">${t.emoji}</div><div class="name">${esc(t.name)}</div>${t.qty ? `<div class="qty">${esc(t.qty)}</div>` : ''}</div>`;
   }
 
@@ -146,7 +151,7 @@ class GroceryTilesCard extends HTMLElement {
     const cfg = this._config;
     this.shadowRoot.innerHTML = `<style>${STYLE}${STYLE_ADD}${STYLE_MORE}</style><ha-card class="card" style="--gt-cols:${cfg.columns || 3}">
       ${cfg.title ? `<h1>${esc(cfg.title)}</h1>` : ''}
-      <div class="addrow"><input class="add" type="text" placeholder="Artikel hinzufügen…" autocomplete="off" enterkeyhint="done"><button data-action="add" aria-label="Hinzufügen">+</button></div>
+      <div class="addrow"><input class="add" type="text" placeholder="${esc(this._t('add_placeholder'))}" autocomplete="off" enterkeyhint="done"><button data-action="add" aria-label="${esc(this._t('add'))}">+</button></div>
       <div class="chips-slot"></div><div class="body-slot"></div><div class="toast-slot"></div></ha-card>`;
     const root = this.shadowRoot;
     this._shell = {
@@ -182,24 +187,24 @@ class GroceryTilesCard extends HTMLElement {
     this._shell.input.disabled = !st || st.state === 'unavailable';
     let body = '';
     if (!st) {
-      body = `<div class="warn">Entity nicht gefunden: ${esc(cfg.entity)}</div>`;
+      body = `<div class="warn">${esc(this._t('entity_missing', { name: cfg.entity }))}</div>`;
     } else {
       const unavailable = st.state === 'unavailable' || st.state === 'unknown';
       const groups = this._groups();
       const done = this._done();
-      if (unavailable) body += `<div class="warn">${esc(cfg.entity)} ist nicht erreichbar.</div>`;
+      if (unavailable) body += `<div class="warn">${esc(this._t('entity_unavailable', { name: cfg.entity }))}</div>`;
       body += groups.length
         ? groups.map(g => `<section class="group" style="--gt-color:${g.c.color}">
-            <div class="group-head"><span>${g.c.emoji}</span><span>${esc(g.c.label)}</span><span class="count">${g.tiles.length}</span></div>
+            <div class="group-head"><span>${g.c.emoji}</span><span>${esc(this._t('cat_' + g.c.id))}</span><span class="count">${g.tiles.length}</span></div>
             <div class="${gridClass}">${g.tiles.map(t => this._tile(t, false)).join('')}</div></section>`).join('')
-        : `<div class="empty">Liste ist leer.</div>`;
+        : `<div class="empty">${esc(this._t('empty'))}</div>`;
       if (cfg.show_recent && done.length) {
         const shown = this._showAllRecent ? done : done.slice(0, cfg.recent_limit);
         const rest = done.length - shown.length;
-        body += `<div class="recent-head"><span>Zuletzt</span><span class="spacer"></span>
-          ${cfg.show_clear_completed ? `<button class="link" data-action="clear">Erledigte löschen</button>` : ''}</div>
+        body += `<div class="recent-head"><span>${esc(this._t('recent'))}</span><span class="spacer"></span>
+          ${cfg.show_clear_completed ? `<button class="link" data-action="clear">${esc(this._t('clear_completed'))}</button>` : ''}</div>
           <div class="${gridClass} recent">${shown.map(t => this._tile(t, true)).join('')}</div>
-          ${rest > 0 ? `<button class="link" data-action="more">mehr anzeigen (${rest})</button>` : ''}`;
+          ${rest > 0 ? `<button class="link" data-action="more">${esc(this._t('show_more', { n: rest }))}</button>` : ''}`;
       }
     }
     this._shell.body.innerHTML = body;
@@ -238,10 +243,10 @@ class GroceryTilesCard extends HTMLElement {
     menu.className = 'menu';
     menu.style.left = `${Math.min(r.left, window.innerWidth - 180)}px`;
     menu.style.top = `${Math.min(r.bottom + 4, window.innerHeight - 120)}px`;
-    menu.innerHTML = `<button data-action="rename">Umbenennen</button><button data-action="delete">Löschen</button>`;
+    menu.innerHTML = `<button data-action="rename">${esc(this._t('rename'))}</button><button data-action="delete">${esc(this._t('delete'))}</button>`;
     menu.querySelector('[data-action="delete"]').addEventListener('click', () => { this._closeMenu(); this._remove(uid); });
     menu.querySelector('[data-action="rename"]').addEventListener('click', () => {
-      menu.innerHTML = `<input type="text" value="${esc(it.summary)}" aria-label="Neuer Name">`;
+      menu.innerHTML = `<input type="text" value="${esc(it.summary)}" aria-label="${esc(this._t('new_name'))}">`;
       const inp = menu.querySelector('input'); inp.focus(); inp.select();
       inp.addEventListener('keydown', e => {
         if (e.key === 'Enter') { this._closeMenu(); this._rename(uid, inp.value); }
@@ -277,7 +282,7 @@ class GroceryTilesCard extends HTMLElement {
     this._items = mutate(before.map(i => ({ ...i })));
     this._render();
     try { await this._call(service, data); }
-    catch (e) { this._items = before; this._toast(e?.message || 'Fehler'); }
+    catch (e) { this._items = before; this._toast(e?.message || this._t('error')); }
   }
 
   _toggle(uid) {
@@ -292,7 +297,7 @@ class GroceryTilesCard extends HTMLElement {
     if (!summary) return;
     const key = normalize(summary);
     const open = this._items.find(i => i.status === 'needs_action' && normalize(i.summary) === key);
-    if (open) { this._setDraft(''); this._toast(`„${splitQuantity(open.summary).name}" ist schon auf der Liste`); return; }
+    if (open) { this._setDraft(''); this._toast(this._t('already_on_list', { name: splitQuantity(open.summary).name })); return; }
     const done = this._items.find(i => i.status === 'completed' && normalize(i.summary) === key);
     if (done) { this._setDraft(''); this._toggle(done.uid); return; }
     this._setDraft('');
@@ -310,13 +315,13 @@ class GroceryTilesCard extends HTMLElement {
     const it = this._items.find(i => i.uid === uid);
     if (!it) return;
     this._optimistic(items => items.filter(i => i.uid !== uid), 'remove_item', { item: [uid] });
-    this._toast(`„${splitQuantity(it.summary).name}" gelöscht`);
+    this._toast(this._t('deleted', { name: splitQuantity(it.summary).name }));
   }
 
   _clearCompleted() {
     const n = this._items.filter(i => i.status === 'completed').length;
     if (!n) return;
-    if (!confirm(`${n} erledigte Einträge endgültig löschen?`)) return;
+    if (!confirm(this._t('confirm_clear', { n }))) return;
     this._optimistic(items => items.filter(i => i.status !== 'completed'), 'remove_completed_items', {});
   }
 }
@@ -328,7 +333,7 @@ class GroceryTilesCardEditor extends HTMLElement {
     if (!this._hass || !this._config) return;
     if (!this._form) {
       this._form = document.createElement('ha-form');
-      this._form.computeLabel = s => ({ entity: 'To-do-Entity', title: 'Titel', columns: 'Spalten (0 = automatisch)', show_recent: '„Zuletzt" anzeigen', recent_limit: 'Max. Kacheln unter „Zuletzt"', show_clear_completed: 'Button „Erledigte löschen"' }[s.name] || s.name);
+      this._form.computeLabel = s => t(pickLang(null, this._hass), 'cfg_' + s.name);
       this._form.schema = [
         { name: 'entity', required: true, selector: { entity: { domain: 'todo' } } },
         { name: 'title', selector: { text: {} } },
@@ -336,6 +341,7 @@ class GroceryTilesCardEditor extends HTMLElement {
         { name: 'show_recent', selector: { boolean: {} } },
         { name: 'recent_limit', selector: { number: { min: 1, max: 200, mode: 'box' } } },
         { name: 'show_clear_completed', selector: { boolean: {} } },
+        { name: 'language', selector: { select: { mode: 'dropdown', options: [{ value: '', label: 'auto' }, { value: 'de', label: 'Deutsch' }, { value: 'en', label: 'English' }, { value: 'it', label: 'Italiano' }] } } },
       ];
       this._form.addEventListener('value-changed', e => {
         this._config = { ...this._config, ...e.detail.value };
@@ -351,4 +357,4 @@ class GroceryTilesCardEditor extends HTMLElement {
 customElements.define('grocery-tiles-card-editor', GroceryTilesCardEditor);
 customElements.define('grocery-tiles-card', GroceryTilesCard);
 window.customCards = window.customCards || [];
-window.customCards.push({ type: 'grocery-tiles-card', name: 'Grocery Tiles Card', description: 'Einkaufsliste als Emoji-Kacheln nach Kategorien (Bring-Style) für jede todo-Entity.', preview: true });
+window.customCards.push({ type: 'grocery-tiles-card', name: 'Grocery Tiles Card', description: t('en', 'card_description'), preview: true });

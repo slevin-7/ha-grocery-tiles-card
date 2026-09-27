@@ -6,7 +6,7 @@
   .wrap{max-width:500px}</style>
 <div class="wrap"><grocery-tiles-card id="card"></grocery-tiles-card></div>
 <script type="module">
-  import '../grocery-tiles-card.js';
+  import '../dist/grocery-tiles-card.js';
   const ENTITY = 'todo.mealie_einkaufsliste';
   const items = [
     { uid: '1', summary: '2 Stück Eier', status: 'needs_action' },
@@ -23,6 +23,7 @@
   const emit = () => cb && cb({ items: items.map(i => ({ ...i })) });
   window.hass = {
     states: { [ENTITY]: { state: String(items.filter(i => i.status === 'needs_action').length), attributes: { friendly_name: 'Einkaufsliste' } } },
+    language: 'en',
     connection: { subscribeMessage: async (fn, msg) => { console.log('subscribe', msg); cb = fn; setTimeout(emit, 0); return () => { cb = null; }; } },
     callService: async (domain, service, data, target) => {
       console.log('callService', domain, service, JSON.stringify(data), JSON.stringify(target));

@@ -1,6 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { CATEGORIES, categorize } from './food-db.js';
+import { CATEGORIES, categorize } from './dist/food-db.js';
 
 test('CATEGORIES hat die Bring-Reihenfolge und endet mit other', () => {
   assert.deepEqual(CATEGORIES.map(c => c.id), [
@@ -56,7 +56,7 @@ test('Override mit unbekannter Kategorie fällt auf other zurück', () => {
   assert.equal(categorize('Foo', [{ match: 'foo', category: 'nope' }]), 'other');
 });
 
-import { emojiFor, splitQuantity, normalize, suggest } from './food-db.js';
+import { emojiFor, splitQuantity, normalize, suggest } from './dist/food-db.js';
 
 test('emojiFor: direkter Treffer, längster Substring, Kategorie-Fallback, 🛒', () => {
   assert.equal(emojiFor('Milch'), '🥛');

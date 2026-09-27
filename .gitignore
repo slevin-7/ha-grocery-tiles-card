@@ -3,3 +3,4 @@ graphify-out/
 .claude/
 CLAUDE.md
 .DS_Store
+test/harness_*.png

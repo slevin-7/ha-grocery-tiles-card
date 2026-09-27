@@ -3,8 +3,8 @@
 *English:* A Home Assistant Lovelace card that renders any `todo.*` entity as a Bring!-style grid of
 emoji tiles grouped by grocery category. Tap to check off, tap a grey tile under "Recently" to put it
 back. Category and emoji are derived client-side from the item name (German/English/Italian keywords),
-nothing is written back into the list. No build step, no dependencies. UI strings are German for now,
-contributions welcome. Install via HACS as a custom repository (category *Dashboard*).
+nothing is written back into the list. No build step, no dependencies. UI in German, English and
+Italian (follows the HA user language, override with `language`). Install via HACS as a custom repository (category *Dashboard*).
 
 Eine Home-Assistant-Lovelace-Karte, die eine beliebige `todo.*`-Entity als Emoji-Kachel-Grid
 nach Einkaufskategorien zeigt (Bring!-Stil). Antippen hakt ab, erledigte Artikel landen als
@@ -38,6 +38,7 @@ graue Kacheln unter „Zuletzt" und lassen sich mit einem Tap zurückholen.
 | `show_recent` | bool | `true` | Bereich „Zuletzt" mit erledigten Artikeln |
 | `recent_limit` | number | `30` | sichtbare graue Kacheln, Rest hinter „mehr anzeigen" |
 | `show_clear_completed` | bool | `true` | Button „Erledigte löschen" |
+| `language` | string | auto | UI-Sprache `de`, `en` oder `it`; leer = Sprache des HA-Nutzerprofils |
 | `overrides` | list | `[]` | eigene Zuordnungen, s. u. (nur per YAML) |
 
 Alle Optionen außer `overrides` sind auch im visuellen Editor einstellbar.
@@ -56,6 +57,18 @@ overrides:
 Datenbank. `category` ist eine der IDs `fruits_vegetables`, `dairy_eggs`, `meat_fish`,
 `bread_bakery`, `pasta_grains`, `frozen`, `beverages`, `other`.
 
+## Sprache / Language
+
+Die Karte übernimmt die Sprache automatisch aus dem HA-Nutzerprofil (Einstellungen → Person →
+Sprache). Unterstützt sind Deutsch, Englisch und Italienisch, alles andere fällt auf Englisch
+zurück. Mit `language: de|en|it` lässt sich die Sprache pro Karte fest vorgeben (auch im
+visuellen Editor). Die Keyword-/Emoji-Datenbank für die Kategorien deckt unabhängig davon alle
+drei Sprachen ab, gemischte Listen funktionieren also in jeder UI-Sprache.
+
+*English:* The UI language follows the HA user profile automatically (German, English, Italian,
+anything else falls back to English). Set `language: de|en|it` to pin it per card. The keyword
+database used for categorising items covers all three languages regardless of the UI language.
+
 ## Hinweis Mealie
 
 Die Karte ändert den Namen eines Artikels nie von selbst, sie schaltet nur den Status um.
@@ -65,7 +78,8 @@ von Home Assistant macht aus einem Rezept-/Lebensmittel-Eintrag dann eine reine 
 
 ## Entwicklung
 
-Reine Logik (`food-db.js`) testen: `node --test food-db.test.mjs`.
+Quellen liegen in `dist/` (HACS liefert `grocery-tiles-card.js` samt `food-db.js` und `i18n.js` von dort aus).
+Reine Logik testen: `node --test '*.test.mjs'`.
 Rendering ohne Home Assistant prüfen: `node test/shot.mjs` erzeugt `test/harness.png`
 (Headless-Chromium über playwright-core, Pfade in `test/shot.mjs`).
 
