@@ -77,10 +77,11 @@ class GroceryTilesCard extends HTMLElement {
   set hass(hass) {
     const connChanged = this._hass?.connection !== hass?.connection;
     const stChanged = this._hass?.states?.[this._config?.entity] !== hass?.states?.[this._config?.entity];
-    const langChanged = this._hass && pickLang(this._config, this._hass) !== pickLang(this._config, hass);
     this._hass = hass;
     if (connChanged) this._resubscribe();
-    if (langChanged) this._shell = null; // Platzhalter/aria im Eingabefeld hängen an der Sprache
+    // Platzhalter/aria im Eingabefeld hängen an der Sprache. Die Hülle kann vor dem ersten hass
+    // (setConfig) entstanden sein → immer gegen die Sprache prüfen, mit der sie gebaut wurde.
+    if (this._shell && this._shellLang !== this._lang()) this._shell = null;
     // HA setzt hass bei jeder Zustandsänderung irgendeiner Entity — nur rendern, wenn uns etwas betrifft.
     if (stChanged || !this._shell) this._render();
   }
@@ -149,6 +150,7 @@ class GroceryTilesCard extends HTMLElement {
   // Tastenkürzel („a" = Assist) fangen die nächste Taste ab.
   _buildShell() {
     const cfg = this._config;
+    this._shellLang = this._lang();
     this.shadowRoot.innerHTML = `<style>${STYLE}${STYLE_ADD}${STYLE_MORE}</style><ha-card class="card" style="--gt-cols:${cfg.columns || 3}">
       ${cfg.title ? `<h1>${esc(cfg.title)}</h1>` : ''}
       <div class="addrow"><input class="add" type="text" placeholder="${esc(this._t('add_placeholder'))}" autocomplete="off" enterkeyhint="done"><button data-action="add" aria-label="${esc(this._t('add'))}">+</button></div>
