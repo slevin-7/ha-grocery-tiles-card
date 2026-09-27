@@ -1,5 +1,6 @@
 // test/shot.mjs — nutzt playwright-core aus dem Codex-Runtime + gecachtes Chromium (kein npm nötig)
-import { chromium } from '/Users/albert.hoffmann/.cache/codex-runtimes/codex-primary-runtime/dependencies/node/node_modules/playwright-core/index.mjs';
+// playwright-core: per npm installiert oder Pfad zu einer vorhandenen Installation via PLAYWRIGHT_CORE.
+const { chromium } = await import(process.env.PLAYWRIGHT_CORE || 'playwright-core');
 import { fileURLToPath } from 'node:url';
 import path from 'node:path';
 const here = path.dirname(fileURLToPath(import.meta.url));

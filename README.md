@@ -1,5 +1,11 @@
 # Grocery Tiles Card
 
+*English:* A Home Assistant Lovelace card that renders any `todo.*` entity as a Bring!-style grid of
+emoji tiles grouped by grocery category. Tap to check off, tap a grey tile under "Recently" to put it
+back. Category and emoji are derived client-side from the item name (German/English/Italian keywords),
+nothing is written back into the list. No build step, no dependencies. UI strings are German for now,
+contributions welcome. Install via HACS as a custom repository (category *Dashboard*).
+
 Eine Home-Assistant-Lovelace-Karte, die eine beliebige `todo.*`-Entity als Emoji-Kachel-Grid
 nach Einkaufskategorien zeigt (Bring!-Stil). Antippen hakt ab, erledigte Artikel landen als
 graue Kacheln unter „Zuletzt" und lassen sich mit einem Tap zurückholen.
