@@ -84,15 +84,36 @@ test('splitQuantity erkennt Klammer-Menge hinten (Nisbo-Altbestand)', () => {
   assert.deepEqual(splitQuantity('Butter (2)'), { name: 'Butter', qty: '2' });
 });
 
+test('splitQuantity erkennt Mengen hinten', () => {
+  assert.deepEqual(splitQuantity('Quark 2x'), { name: 'Quark', qty: '2x' });
+  assert.deepEqual(splitQuantity('Quark 2 x'), { name: 'Quark', qty: '2x' });
+  assert.deepEqual(splitQuantity('Quark 2×'), { name: 'Quark', qty: '2x' });
+  assert.deepEqual(splitQuantity('Milch x2'), { name: 'Milch', qty: '2x' });
+  assert.deepEqual(splitQuantity('Milch x 2'), { name: 'Milch', qty: '2x' });
+  assert.deepEqual(splitQuantity('Käse 200 g'), { name: 'Käse', qty: '200 g' });
+  assert.deepEqual(splitQuantity('Kartoffeln 1,5 kg'), { name: 'Kartoffeln', qty: '1,5 kg' });
+  assert.deepEqual(splitQuantity('Eier 6 Stück'), { name: 'Eier', qty: '6 Stück' });
+  assert.deepEqual(splitQuantity('Bier 6 Flaschen'), { name: 'Bier', qty: '6 Flaschen' });
+});
+
 test('splitQuantity lässt Namen ohne Menge unverändert', () => {
   assert.deepEqual(splitQuantity('Bier (eventuell helles ansonsten Marke egal)'),
     { name: 'Bier (eventuell helles ansonsten Marke egal)', qty: '' });
   assert.deepEqual(splitQuantity('Tiptoi Mail'), { name: 'Tiptoi Mail', qty: '' });
+  assert.deepEqual(splitQuantity('Cola Zero'), { name: 'Cola Zero', qty: '' });
+  assert.deepEqual(splitQuantity('Omega 3'), { name: 'Omega 3', qty: '' });
+  assert.deepEqual(splitQuantity('Nivea 24h'), { name: 'Nivea 24h', qty: '' });
+  assert.deepEqual(splitQuantity('Playstation 5'), { name: 'Playstation 5', qty: '' });
   assert.deepEqual(splitQuantity('  Milch  '), { name: 'Milch', qty: '' });
+});
+
+test('splitQuantity bevorzugt führende Mengen', () => {
+  assert.deepEqual(splitQuantity('2 Stück Eier 3x'), { name: 'Eier 3x', qty: '2 Stück' });
 });
 
 test('normalize gleicht Mengen- und Schreibvarianten an', () => {
   assert.equal(normalize('Milch'), normalize('2 L Milch'));
+  assert.equal(normalize('Quark 2x'), normalize('Quark'));
   assert.equal(normalize('  Hafer   Milch '), 'hafer milch');
   assert.notEqual(normalize('Milch'), normalize('Hafermilch'));
 });

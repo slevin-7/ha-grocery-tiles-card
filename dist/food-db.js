@@ -405,15 +405,19 @@ export function emojiFor(name, overrides = []) {
   return CATEGORY_EMOJI[categorize(lower, overrides)] || '🛒';
 }
 
-const LEADING_QTY = /^\s*(\d+(?:[.,]\d+)?\s*(?:x|×)?(?:\s*(?:stück|stk\.?|st\.?|kg|g|l|ml|el|tl|pck\.?|packung|packungen|dose|dosen|flasche|flaschen|bund|becher|glas|scheiben|pack|liter|gramm))?)\s+(.+)$/i;
-const TRAILING_QTY = /^(.*\S)\s+\((\d+)\)\s*$/;
+const UNITS = 'stück|stk\\.?|st\\.?|kg|g|l|ml|el|tl|pck\\.?|packung|packungen|dose|dosen|flasche|flaschen|bund|becher|glas|scheiben|pack|liter|gramm';
+const LEADING_QTY = new RegExp(`^\\s*(\\d+(?:[.,]\\d+)?\\s*(?:x|×)?(?:\\s*(?:${UNITS}))?)\\s+(.+)$`, 'i');
+const TRAILING_PAREN_QTY = /^(.*\S)\s+\((\d+)\)\s*$/;
+const TRAILING_QTY = new RegExp(`^(.*\\S)\\s+(?:(\\d+(?:[.,]\\d+)?)\\s*(?:x|×)|(?:x|×)\\s*(\\d+)|(\\d+(?:[.,]\\d+)?\\s*(?:${UNITS})))\\s*$`, 'i');
 
 export function splitQuantity(summary) {
   const s = String(summary || '').trim().replace(/\s+/g, ' ');
   let m = LEADING_QTY.exec(s);
   if (m) return { name: m[2].trim(), qty: m[1].trim() };
-  m = TRAILING_QTY.exec(s);
+  m = TRAILING_PAREN_QTY.exec(s);
   if (m) return { name: m[1].trim(), qty: m[2] };
+  m = TRAILING_QTY.exec(s);
+  if (m) return { name: m[1].trim(), qty: m[2] || m[3] ? `${m[2] || m[3]}x` : m[4].trim() };
   return { name: s, qty: '' };
 }
 

@@ -14,7 +14,7 @@ graue Kacheln unter „Zuletzt" und lassen sich mit einem Tap zurückholen.
 
 - Kategorie und Emoji werden **clientseitig aus dem Artikelnamen** abgeleitet (DE/EN/IT-Keywords)
   und nie in die Liste zurückgeschrieben.
-- Mengen wie `2 Stück Eier` oder `1 kg Karotten` werden erkannt und klein unter dem Namen angezeigt.
+- Mengen wie `2 Stück Eier`, `1 kg Karotten`, `Quark 2x` oder `Käse 200 g` werden erkannt und klein unter dem Namen angezeigt.
 - Vorschlags-Chips beim Tippen (zuerst aus der eigenen Liste, dann aus der Emoji-Datenbank).
 - Duplikat-Schutz: ein bereits offener Artikel wird nicht doppelt angelegt, ein erledigter wird reaktiviert.
 - Long-Press auf eine Kachel: Umbenennen oder Löschen.
