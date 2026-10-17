@@ -133,3 +133,15 @@ test('suggest: Emoji-Keys werden kapitalisiert geliefert', () => {
   assert.ok(s.every(x => x[0] === x[0].toUpperCase()));
   assert.ok(s.some(x => x.toLowerCase() === 'butter'));
 });
+
+test('emojiFor: Bilder aus Albert-Liste 2026-10', () => {
+  assert.equal(emojiFor('Pommes'), '🍟');
+  assert.equal(emojiFor('Himbeeren TK'), '🍓');
+  assert.equal(emojiFor('Sahnesteif'), '🧁');
+  assert.equal(emojiFor('Mascarpone'), '🧀');
+  assert.equal(emojiFor('Quark'), '🥣');
+  assert.equal(emojiFor('Schnittlauch'), '🌿');
+  assert.equal(emojiFor('Wassermelone'), '🍉');
+  assert.equal(emojiFor('Reis'), '🍚');
+  assert.equal(emojiFor('Kaffeebohnen'), '☕');
+});
