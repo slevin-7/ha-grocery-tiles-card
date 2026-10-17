@@ -39,6 +39,7 @@ graue Kacheln unter „Zuletzt" und lassen sich mit einem Tap zurückholen.
 | `recent_limit` | number | `30` | sichtbare graue Kacheln, Rest hinter „mehr anzeigen" |
 | `show_clear_completed` | bool | `true` | Button „Erledigte löschen" |
 | `language` | string | auto | UI-Sprache `de`, `en` oder `it`; leer = Sprache des HA-Nutzerprofils |
+| `images` | bool | true | 3D-Bilder (Fluent Emoji) statt Text-Emoji; `false` = nur Emoji |
 | `overrides` | list | `[]` | eigene Zuordnungen, s. u. (nur per YAML) |
 
 Alle Optionen außer `overrides` sind auch im visuellen Editor einstellbar.
@@ -86,3 +87,5 @@ Rendering ohne Home Assistant prüfen: `node test/shot.mjs` erzeugt `test/harnes
 ## Lizenz
 
 MIT
+
+Bilder in `dist/img/`: [Fluent Emoji 3D](https://github.com/microsoft/fluentui-emoji) von Microsoft, MIT-Lizenz.

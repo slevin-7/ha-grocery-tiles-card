@@ -2,7 +2,11 @@
 import { CATEGORIES, categorize, emojiFor, splitQuantity, suggest, normalize } from './food-db.js';
 import { t, pickLang } from './i18n.js';
 
-const DEFAULTS = { title: '', columns: 0, show_recent: true, recent_limit: 30, show_clear_completed: true, overrides: [], language: '' };
+const DEFAULTS = { title: '', columns: 0, show_recent: true, recent_limit: 30, show_clear_completed: true, overrides: [], language: '', images: true };
+
+// Fluent Emoji 3D (MIT, Microsoft) als WebP in ./img/<codepoint>.webp; fehlt eins, bleibt das Emoji.
+const IMG_BASE = new URL('./img/', import.meta.url).href;
+const codepoint = e => [...e.replace(/️/g, '')].map(c => c.codePointAt(0).toString(16)).join('-');
 
 const STYLE = `
   :host { display: block; }
@@ -16,6 +20,7 @@ const STYLE = `
   .tile { aspect-ratio: 1; border-radius: 8px; background: var(--secondary-background-color); display: flex; flex-direction: column; align-items: center; justify-content: center; text-align: center; padding: 6px; cursor: pointer; user-select: none; -webkit-user-select: none; transition: transform .12s, opacity .15s; }
   .tile:active { transform: scale(.96); }
   .tile .emoji { font-size: 32px; line-height: 1.1; }
+  .tile .emoji img { width: 48px; height: 48px; display: block; }
   .tile .name { font-size: 13px; line-height: 1.2; margin-top: 4px; overflow: hidden; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; }
   .tile .qty { font-size: 11px; color: var(--secondary-text-color); margin-top: 2px; }
   .tile.done { opacity: .55; }
@@ -140,9 +145,14 @@ class GroceryTilesCard extends HTMLElement {
     return s.length ? `<div class="chips">${s.map(n => `<button class="chip" data-name="${esc(n)}">${emojiFor(n, this._config.overrides)} ${esc(n)}</button>`).join('')}</div>` : '';
   }
 
+  _art(emoji) {
+    if (this._config.images === false) return emoji;
+    return `<img src="${IMG_BASE}${codepoint(emoji)}.webp" alt="${esc(emoji)}" loading="lazy" onerror="this.replaceWith(this.alt)">`;
+  }
+
   _tile(t, done) {
     return `<div class="tile${done ? ' done' : ''}" data-uid="${esc(t.uid)}" role="button" tabindex="0" aria-label="${esc(t.name)}${done ? ` (${esc(this._t('done'))})` : ''}">
-      <div class="emoji">${t.emoji}</div><div class="name">${esc(t.name)}</div>${t.qty ? `<div class="qty">${esc(t.qty)}</div>` : ''}</div>`;
+      <div class="emoji">${this._art(t.emoji)}</div><div class="name">${esc(t.name)}</div>${t.qty ? `<div class="qty">${esc(t.qty)}</div>` : ''}</div>`;
   }
 
   // Hülle (Style, Karte, Titel, Eingabezeile, Container) wird EINMAL gebaut. Das Eingabefeld
@@ -343,6 +353,7 @@ class GroceryTilesCardEditor extends HTMLElement {
         { name: 'show_recent', selector: { boolean: {} } },
         { name: 'recent_limit', selector: { number: { min: 1, max: 200, mode: 'box' } } },
         { name: 'show_clear_completed', selector: { boolean: {} } },
+        { name: 'images', selector: { boolean: {} } },
         { name: 'language', selector: { select: { mode: 'dropdown', options: [{ value: '', label: 'auto' }, { value: 'de', label: 'Deutsch' }, { value: 'en', label: 'English' }, { value: 'it', label: 'Italiano' }] } } },
       ];
       this._form.addEventListener('value-changed', e => {
