@@ -4,7 +4,7 @@ import { t, pickLang } from './i18n.js';
 
 const DEFAULTS = { title: '', columns: 0, show_recent: true, recent_limit: 30, show_clear_completed: true, overrides: [], language: '', images: true };
 
-// Fluent Emoji 3D (MIT, Microsoft) als WebP in ./img/<codepoint>.webp; fehlt eins, bleibt das Emoji.
+// OpenMoji-Linienbilder (CC BY-SA 4.0) als SVG in ./img/<codepoint>.svg; fehlt eins, bleibt das Emoji.
 const IMG_BASE = new URL('./img/', import.meta.url).href;
 const codepoint = e => [...e.replace(/️/g, '')].map(c => c.codePointAt(0).toString(16)).join('-');
 
@@ -21,6 +21,7 @@ const STYLE = `
   .tile:active { transform: scale(.96); }
   .tile .emoji { font-size: 32px; line-height: 1.1; }
   .tile .emoji img { width: 48px; height: 48px; display: block; }
+  :host([dark]) .tile .emoji img { filter: invert(1); } /* schwarze Linien auf dunklen Kacheln sonst unsichtbar */
   .tile .name { font-size: 13px; line-height: 1.2; margin-top: 4px; overflow: hidden; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; }
   .tile .qty { font-size: 11px; color: var(--secondary-text-color); margin-top: 2px; }
   .tile.done { opacity: .55; }
@@ -83,6 +84,7 @@ class GroceryTilesCard extends HTMLElement {
     const connChanged = this._hass?.connection !== hass?.connection;
     const stChanged = this._hass?.states?.[this._config?.entity] !== hass?.states?.[this._config?.entity];
     this._hass = hass;
+    this.toggleAttribute('dark', !!hass?.themes?.darkMode);
     if (connChanged) this._resubscribe();
     // Platzhalter/aria im Eingabefeld hängen an der Sprache. Die Hülle kann vor dem ersten hass
     // (setConfig) entstanden sein → immer gegen die Sprache prüfen, mit der sie gebaut wurde.
@@ -147,7 +149,7 @@ class GroceryTilesCard extends HTMLElement {
 
   _art(emoji) {
     if (this._config.images === false) return emoji;
-    return `<img src="${IMG_BASE}${codepoint(emoji)}.webp" alt="${esc(emoji)}" loading="lazy" onerror="this.replaceWith(this.alt)">`;
+    return `<img src="${IMG_BASE}${codepoint(emoji)}.svg" alt="${esc(emoji)}" loading="lazy" onerror="this.replaceWith(this.alt)">`;
   }
 
   _tile(t, done) {
