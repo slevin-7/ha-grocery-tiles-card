@@ -21,7 +21,8 @@ const STYLE = `
   .tile:active { transform: scale(.96); }
   .tile .emoji { font-size: 32px; line-height: 1.1; }
   .tile .emoji img { width: 48px; height: 48px; display: block; }
-  :host([dark]) .tile .emoji img { filter: invert(1); } /* schwarze Linien auf dunklen Kacheln sonst unsichtbar */
+  .art-s { width: 20px; height: 20px; vertical-align: -5px; }
+  :host([dark]) .tile .emoji img, :host([dark]) img.art-s { filter: invert(1); } /* schwarze Linien auf dunklen Kacheln sonst unsichtbar */
   .tile .name { font-size: 13px; line-height: 1.2; margin-top: 4px; overflow: hidden; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; }
   .tile .qty { font-size: 11px; color: var(--secondary-text-color); margin-top: 2px; }
   .tile.done { opacity: .55; }
@@ -144,12 +145,12 @@ class GroceryTilesCard extends HTMLElement {
     if (!this._draft) return '';
     const names = [...this._done(), ...this._open()].map(t => t.name);
     const s = suggest(this._draft, names, 6);
-    return s.length ? `<div class="chips">${s.map(n => `<button class="chip" data-name="${esc(n)}">${emojiFor(n, this._config.overrides)} ${esc(n)}</button>`).join('')}</div>` : '';
+    return s.length ? `<div class="chips">${s.map(n => `<button class="chip" data-name="${esc(n)}">${this._art(emojiFor(n, this._config.overrides), 'art-s')} ${esc(n)}</button>`).join('')}</div>` : '';
   }
 
-  _art(emoji) {
+  _art(emoji, cls = '') {
     if (this._config.images === false) return emoji;
-    return `<img src="${IMG_BASE}${codepoint(emoji)}.svg" alt="${esc(emoji)}" loading="lazy" onerror="this.replaceWith(this.alt)">`;
+    return `<img${cls ? ` class="${cls}"` : ''} src="${IMG_BASE}${codepoint(emoji)}.svg" alt="${esc(emoji)}" loading="lazy" onerror="this.replaceWith(this.alt)">`;
   }
 
   _tile(t, done) {
@@ -209,7 +210,7 @@ class GroceryTilesCard extends HTMLElement {
       if (unavailable) body += `<div class="warn">${esc(this._t('entity_unavailable', { name: cfg.entity }))}</div>`;
       body += groups.length
         ? groups.map(g => `<section class="group" style="--gt-color:${g.c.color}">
-            <div class="group-head"><span>${g.c.emoji}</span><span>${esc(this._t('cat_' + g.c.id))}</span><span class="count">${g.tiles.length}</span></div>
+            <div class="group-head"><span>${this._art(g.c.emoji, 'art-s')}</span><span>${esc(this._t('cat_' + g.c.id))}</span><span class="count">${g.tiles.length}</span></div>
             <div class="${gridClass}">${g.tiles.map(t => this._tile(t, false)).join('')}</div></section>`).join('')
         : `<div class="empty">${esc(this._t('empty'))}</div>`;
       if (cfg.show_recent && done.length) {
